@@ -6,6 +6,7 @@ import warnings
 from promptflow.tracing import start_trace
 
 import streamlit.components.v1 as components
+
 def mermaid(placeholder, code: str) -> None:
     with placeholder:
         components.html(
@@ -323,4 +324,4 @@ if (st.session_state.able_to_run):
             st.session_state.messages = []
             st.session_state.first_query = True
             st.write("Chat history cleared.")
-            st.run()
+            st.rerun()
