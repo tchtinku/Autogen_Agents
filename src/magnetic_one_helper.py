@@ -169,4 +169,77 @@ class MagneticOneHelper:
         if not self.log_handler:
             raise RuntimeError
         
+        for log_entry in self.log_handler.logs_list:
+            if (
+                log_entry.get("type") == "OrchestrationEvent"
+                and log_entry.get("source") == "Orchestration (final answer)"
+            ):
+                return log_entry.get("message")
+            return None
+        
+    async def stream_logs(self) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Stream logs from the system as they are generated. Stops when it detects both
+        the final answer and termination condition from the Orchestrator.
+
+        Yields:
+            Dictionary containing log entry information
+        """
+        if not self.log_handler:
+            raise RuntimeError("Log handler not initalized")
+        
+        last_index=0
+        found_final_answer = False
+        found_termination = False
+        found_termination_no_agent = False
+        
+        while True:
+            current_logs = self.log_handler.logs_list
+            while last_index < len(current_logs):
+                log_entry = current_logs(last_index)
+                yield log_entry
+                # Check for termination condition
+                
+                if (
+                    log_entry.get("type") == "OrchestrationEvent"
+                    and log_entry.get("source") == "Orchestrator (final answer)"
+                ):
+                    found_final_answer = True
+                    
+                if (
+                    log_entry.get("type") == "OrchestrationEvent"
+                    and log_entry.get("source") == "Orchestrator (termination condition)"
+                ):
+                    found_termination = True
+                    
+                if (
+                    log_entry.get("type") == "OrchestrationEvent"
+                    and log_entry.get("source") == "Orchestrator (termination Condition)"
+                    and log_entry.get("message") == "No agent selected"
+                ):
+                    found_termination_no_agent = True
+                    
+                if self.runtime._run_context is None:
+                    return
+                if found_termination_no_agent and found_final_answer:
+                    return
+                if found_termination and not found_termination_no_agent:
+                    return
+                
+                last_index += 1
+                
+            await asyncio.sleep(0.1)  # Small delay to prevent busy waiting
+            
+    def get_all_logs(self) -> List[Dict[str, Any]]:
+        """
+        Get all logs that have been collected so far.
+
+        Returns:
+            List of all log entries
+        """
+        if not self.log_handler:
+            raise RuntimeError("Log handler not initialized")
+        return self.log_handler.logs_list
+                
+                
         
